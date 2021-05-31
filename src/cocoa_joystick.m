@@ -185,6 +185,15 @@ static void matchCallback(void* context,
     CFArrayRef elements =
         IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
 
+#if 1 // qStrataHacks // we're crashing on a paired cheap iOS bluetooth game controller
+    if (!elements) {
+        CFRelease(axes);
+        CFRelease(buttons);
+        CFRelease(hats);
+        return; // Okay to return without recording anything? Or we could create a dummy entry.
+    }
+#endif
+
     for (i = 0;  i < CFArrayGetCount(elements);  i++)
     {
         IOHIDElementRef native = (IOHIDElementRef)
