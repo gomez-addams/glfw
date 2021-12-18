@@ -31,6 +31,18 @@
 #include <float.h>
 #include <string.h>
 
+
+#if 1 // qStrataHacks -- allow for better support of tool palettes
+typedef void*(*Strata_GLFWWindowCreator)(NSRect, NSWindowStyleMask, NSBackingStoreType, BOOL);
+static Strata_GLFWWindowCreator s_WindowCreator;
+GLFWAPI void strata_glfwSetWindowCreator(Strata_GLFWWindowCreator);
+void strata_glfwSetWindowCreator(Strata_GLFWWindowCreator creator)
+{
+    s_WindowCreator = creator;
+}
+#endif
+
+
 // Returns the style mask corresponding to the window settings
 //
 static NSUInteger getStyleMask(_GLFWwindow* window)
@@ -811,6 +823,13 @@ static GLFWbool createNativeWindow(_GLFWwindow* window,
     else
         contentRect = NSMakeRect(0, 0, wndconfig->width, wndconfig->height);
 
+#if 1 // qStrataHacks
+    if (s_WindowCreator) {
+        // GLFW isn't using ARC but the window creation callback returns ownership
+        window->ns.object = (/*__bridge_transfer*/ NSWindow*)s_WindowCreator(contentRect, getStyleMask(window), NSBackingStoreBuffered, NO);
+    }
+    else
+#endif
     window->ns.object = [[GLFWWindow alloc]
         initWithContentRect:contentRect
                   styleMask:getStyleMask(window)
