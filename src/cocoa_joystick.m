@@ -185,7 +185,7 @@ static void matchCallback(void* context,
     CFArrayRef elements =
         IOHIDDeviceCopyMatchingElements(device, NULL, kIOHIDOptionsTypeNone);
 
-#if 1 // qStrataHacks // we're crashing on a paired cheap iOS bluetooth game controller
+#if 1 // qCustomHacks // we're crashing on a paired cheap iOS bluetooth game controller
     if (!elements) {
         CFRelease(axes);
         CFRelease(buttons);

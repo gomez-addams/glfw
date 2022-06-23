@@ -32,13 +32,29 @@
 #include <string.h>
 
 
-#if 1 // qStrataHacks -- allow for better support of tool palettes
-typedef void*(*Strata_GLFWWindowCreator)(NSRect, NSWindowStyleMask, NSBackingStoreType, BOOL);
-static Strata_GLFWWindowCreator s_WindowCreator;
-GLFWAPI void strata_glfwSetWindowCreator(Strata_GLFWWindowCreator);
-void strata_glfwSetWindowCreator(Strata_GLFWWindowCreator creator)
+#if 1 // qCustomHacks -- allow for better support of tool palettes
+typedef void*(*Custom_GLFWWindowCreator)(NSRect, NSWindowStyleMask, NSBackingStoreType, BOOL);
+static Custom_GLFWWindowCreator s_WindowCreator;
+GLFWAPI void custom_glfwSetWindowCreator(Custom_GLFWWindowCreator);
+void custom_glfwSetWindowCreator(Custom_GLFWWindowCreator creator)
 {
     s_WindowCreator = creator;
+}
+
+typedef BOOL(*Custom_GLFWViewDelay)(NSView*,NSEvent*);
+static Custom_GLFWViewDelay s_ViewDelay;
+GLFWAPI void custom_glfwSetViewDelay(Custom_GLFWViewDelay shouldDelay);
+void custom_glfwSetViewDelay(Custom_GLFWViewDelay shouldDelay)
+{
+    s_ViewDelay = shouldDelay;
+}
+
+typedef void(*Custom_GLFWViewMouseDown)(NSView*,NSEvent*);
+static Custom_GLFWViewMouseDown s_ViewMouseDown;
+GLFWAPI void custom_glfwSetViewMouseDown(Custom_GLFWViewMouseDown handleMouseDown);
+void custom_glfwSetViewMouseDown(Custom_GLFWViewMouseDown handleMouseDown)
+{
+    s_ViewMouseDown = handleMouseDown;
 }
 #endif
 
@@ -421,6 +437,16 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
     updateCursorImage(window);
 }
 
+#if 1 // qCustomHacks
+- (BOOL)shouldDelayWindowOrderingForEvent:(NSEvent *)theEvent
+{
+    if (s_ViewDelay) {
+        return s_ViewDelay(self, theEvent);
+    }
+    return NO;
+}
+#endif
+
 - (BOOL)acceptsFirstMouse:(NSEvent *)event
 {
     return YES;
@@ -428,6 +454,11 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 
 - (void)mouseDown:(NSEvent *)event
 {
+#if 1 // qCustomHacks
+    if (s_ViewMouseDown) {
+        s_ViewMouseDown(self, event);
+    }
+#endif
     _glfwInputMouseClick(window,
                          GLFW_MOUSE_BUTTON_LEFT,
                          GLFW_PRESS,
@@ -823,7 +854,7 @@ static GLFWbool createNativeWindow(_GLFWwindow* window,
     else
         contentRect = NSMakeRect(0, 0, wndconfig->width, wndconfig->height);
 
-#if 1 // qStrataHacks
+#if 1 // qCustomHacks
     if (s_WindowCreator) {
         // GLFW isn't using ARC but the window creation callback returns ownership
         window->ns.object = (/*__bridge_transfer*/ NSWindow*)s_WindowCreator(contentRect, getStyleMask(window), NSBackingStoreBuffered, NO);
