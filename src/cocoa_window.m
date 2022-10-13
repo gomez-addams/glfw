@@ -56,6 +56,23 @@ void custom_glfwSetViewMouseDown(Custom_GLFWViewMouseDown handleMouseDown)
 {
     s_ViewMouseDown = handleMouseDown;
 }
+
+typedef NSObject<NSTextInputClient>*(*Custom_GLFWViewCreateTextInputProxy)(NSView*);
+static Custom_GLFWViewCreateTextInputProxy s_ViewCreateTextInputProxy;
+GLFWAPI void custom_glfwSetViewCreateTextInputProxy(Custom_GLFWViewCreateTextInputProxy createProxy);
+void custom_glfwSetViewCreateTextInputProxy(Custom_GLFWViewCreateTextInputProxy createProxy)
+{
+    s_ViewCreateTextInputProxy = createProxy;
+}
+static BOOL s_UnhandledTextInputProxy;
+GLFWAPI void custom_glfwUnhandledTextInputProxy();
+void custom_glfwUnhandledTextInputProxy()
+{
+    s_UnhandledTextInputProxy = YES;
+}
+
+GLFWAPI void custom_glfwInputChar(NSView* glfwView, unsigned int codepoint, int mods, int plain);
+GLFWAPI void custom_glfwInputKey(NSView* glfwView, int key, int scancode, int action, int mods);
 #endif
 
 
@@ -371,9 +388,17 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
     _GLFWwindow* window;
     NSTrackingArea* trackingArea;
     NSMutableAttributedString* markedText;
+#if 1 // qCustomHacks
+    NSObject<NSTextInputClient>* textInputProxy;
+#endif
 }
 
 - (instancetype)initWithGlfwWindow:(_GLFWwindow *)initWindow;
+
+#if 1 // qCustomHacks
+- (void)glfwInputCharWithCodepoint:(unsigned int)codepoint mods:(int)mods plain:(GLFWbool)plain;
+- (void)glfwInputKey:(int)key scancode:(int)scancode action:(int)action mods:(int)mods;
+#endif
 
 @end
 
@@ -387,6 +412,9 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
         window = initWindow;
         trackingArea = nil;
         markedText = [[NSMutableAttributedString alloc] init];
+#if 1 // qCustomHacks
+        textInputProxy = s_ViewCreateTextInputProxy ? s_ViewCreateTextInputProxy(self) : nil;
+#endif
 
         [self updateTrackingAreas];
         // NOTE: kUTTypeURL corresponds to NSPasteboardTypeURL but is available
@@ -401,8 +429,23 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 {
     [trackingArea release];
     [markedText release];
+#if 1 // qCustomHacks
+    [textInputProxy release];
+#endif
     [super dealloc];
 }
+
+#if 1 // qCustomHacks
+- (void)glfwInputCharWithCodepoint:(unsigned int)codepoint mods:(int)mods plain:(GLFWbool)plain
+{
+    _glfwInputChar(window, codepoint, mods, plain);
+}
+
+- (void)glfwInputKey:(int)key scancode:(int)scancode action:(int)action mods:(int)mods
+{
+    _glfwInputKey(window, key, scancode, action, mods);
+}
+#endif
 
 - (BOOL)isOpaque
 {
@@ -707,11 +750,29 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 
 - (BOOL)hasMarkedText
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        BOOL result = [textInputProxy hasMarkedText];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+    }
+#endif
     return [markedText length] > 0;
 }
 
 - (NSRange)markedRange
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        NSRange result = [textInputProxy markedRange];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+    }
+#endif
     if ([markedText length] > 0)
         return NSMakeRange(0, [markedText length] - 1);
     else
@@ -720,6 +781,15 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 
 - (NSRange)selectedRange
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        NSRange result = [textInputProxy selectedRange];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+    }
+#endif
     return kEmptyRange;
 }
 
@@ -727,6 +797,17 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
         selectedRange:(NSRange)selectedRange
      replacementRange:(NSRange)replacementRange
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        [textInputProxy setMarkedText: string
+                        selectedRange: selectedRange
+                     replacementRange: replacementRange];
+        if (!s_UnhandledTextInputProxy) {
+            return;
+        }
+    }
+#endif
     [markedText release];
     if ([string isKindOfClass:[NSAttributedString class]])
         markedText = [[NSMutableAttributedString alloc] initWithAttributedString:string];
@@ -736,34 +817,93 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
 
 - (void)unmarkText
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        [textInputProxy unmarkText];
+        if (!s_UnhandledTextInputProxy) {
+            return;
+        }
+    }
+#endif
     [[markedText mutableString] setString:@""];
 }
 
 - (NSArray*)validAttributesForMarkedText
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        NSArray* result = [textInputProxy validAttributesForMarkedText];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+        [result release];
+    }
+#endif
     return [NSArray array];
 }
 
 - (NSAttributedString*)attributedSubstringForProposedRange:(NSRange)range
                                                actualRange:(NSRangePointer)actualRange
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        NSAttributedString* result = [textInputProxy attributedSubstringForProposedRange: range
+                                                                             actualRange: actualRange];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+        [result release];
+    }
+#endif
     return nil;
 }
 
 - (NSUInteger)characterIndexForPoint:(NSPoint)point
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        NSUInteger result = [textInputProxy characterIndexForPoint: point];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+    }
+#endif
     return 0;
 }
 
 - (NSRect)firstRectForCharacterRange:(NSRange)range
                          actualRange:(NSRangePointer)actualRange
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        NSRect result = [textInputProxy firstRectForCharacterRange: range
+                                                       actualRange: actualRange];
+        if (!s_UnhandledTextInputProxy) {
+            return result;
+        }
+    }
+#endif
     const NSRect frame = [window->ns.view frame];
     return NSMakeRect(frame.origin.x, frame.origin.y, 0.0, 0.0);
 }
 
 - (void)insertText:(id)string replacementRange:(NSRange)replacementRange
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        [textInputProxy insertText: string
+                  replacementRange: replacementRange];
+        if (!s_UnhandledTextInputProxy) {
+            return;
+        }
+    }
+#endif
     NSString* characters;
     NSEvent* event = [NSApp currentEvent];
     const int mods = translateFlags([event modifierFlags]);
@@ -795,8 +935,19 @@ static const NSRange kEmptyRange = { NSNotFound, 0 };
     }
 }
 
-- (void)doCommandBySelector:(SEL)selector
+- (void)doCommandBySelector:(nonnull SEL)selector
 {
+#if 1 // qCustomHacks
+    if (textInputProxy) {
+        s_UnhandledTextInputProxy = NO;
+        [textInputProxy doCommandBySelector: selector];
+        if (!s_UnhandledTextInputProxy) {
+            return;
+        }
+    }
+#endif
+    // the documentation warns us not to forward this to our super class (if we're an NSTextView???)
+    //[super doCommandBySelector: selector];
 }
 
 @end
@@ -1896,3 +2047,20 @@ GLFWAPI id glfwGetCocoaWindow(GLFWwindow* handle)
     return window->ns.object;
 }
 
+
+#if 1 // qCustomHacks
+void custom_glfwInputChar(NSView* glfwView, unsigned int codepoint, int mods, int plain)
+{
+    [(GLFWContentView*)glfwView glfwInputCharWithCodepoint: codepoint
+                                                      mods: mods
+                                                     plain: plain];
+}
+
+void custom_glfwInputKey(NSView* glfwView, int key, int scancode, int action, int mods)
+{
+    [(GLFWContentView*)glfwView glfwInputKey: key
+                                    scancode: scancode
+                                      action: action
+                                        mods: mods];
+}
+#endif
