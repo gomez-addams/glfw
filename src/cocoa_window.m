@@ -41,6 +41,14 @@ void custom_glfwSetWindowCreator(Custom_GLFWWindowCreator creator)
     s_WindowCreator = creator;
 }
 
+typedef void(*Custom_GLFWWindowShowHide)(GLFWwindow*, NSWindow*, BOOL);
+static Custom_GLFWWindowShowHide s_WindowShowHide;
+GLFWAPI void custom_glfwSetWindowShowHide(Custom_GLFWWindowShowHide);
+void custom_glfwSetWindowShowHide(Custom_GLFWWindowShowHide showHide)
+{
+    s_WindowShowHide = showHide;
+}
+
 typedef BOOL(*Custom_GLFWViewDelay)(NSView*,NSEvent*);
 static Custom_GLFWViewDelay s_ViewDelay;
 GLFWAPI void custom_glfwSetViewDelay(Custom_GLFWViewDelay shouldDelay);
@@ -1372,6 +1380,12 @@ void _glfwPlatformMaximizeWindow(_GLFWwindow* window)
 
 void _glfwPlatformShowWindow(_GLFWwindow* window)
 {
+#if 1 // qCustomHacks
+    if (s_WindowShowHide) {
+        s_WindowShowHide((GLFWwindow*)window, window->ns.object, YES);
+    }
+    else
+#endif
     @autoreleasepool {
     [window->ns.object orderFront:nil];
     } // autoreleasepool
@@ -1379,6 +1393,12 @@ void _glfwPlatformShowWindow(_GLFWwindow* window)
 
 void _glfwPlatformHideWindow(_GLFWwindow* window)
 {
+#if 1 // qCustomHacks
+    if (s_WindowShowHide) {
+        s_WindowShowHide((GLFWwindow*)window, window->ns.object, NO);
+    }
+    else
+#endif
     @autoreleasepool {
     [window->ns.object orderOut:nil];
     } // autoreleasepool
