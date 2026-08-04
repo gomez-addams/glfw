@@ -1,7 +1,7 @@
 //========================================================================
-// GLFW 3.4 macOS - www.glfw.org
+// GLFW 3.6 POSIX - www.glfw.org
 //------------------------------------------------------------------------
-// Copyright (c) 2009-2021 Camilla Löwy <elmindreda@glfw.org>
+// Copyright (c) 2022 Camilla Löwy <elmindreda@glfw.org>
 //
 // This software is provided 'as-is', without any express or implied
 // warranty. In no event will the authors be held liable for any damages
@@ -24,12 +24,7 @@
 //
 //========================================================================
 
-#define GLFW_COCOA_LIBRARY_TIMER_STATE  _GLFWtimerNS   ns;
+#include <poll.h>
 
-// Cocoa-specific global timer data
-//
-typedef struct _GLFWtimerNS
-{
-    uint64_t        frequency;
-} _GLFWtimerNS;
+GLFWbool _glfwPollPOSIX(struct pollfd* fds, nfds_t count, double* timeout);
 
